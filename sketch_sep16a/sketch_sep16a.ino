@@ -68,3 +68,104 @@ void loop() {
   delay(100);
   //}
 }
+/// ВОДОРАЗДЕЛ
+
+
+
+// подключении imu-сенсор на 10 степеней свободы v2: G в GND; V в 3.3V/5v; C в ScL; D в SDA.
+#include <TroykaIMU.h> // Библиотека для работы с модулями IMU
+#include <SoftwareSerial.h>
+
+#define BT_RX 9 // порты для RX 0
+#define BT_TX 10 // для TX 1 для ардуино у других плат см. свои !!!!!!!!!!!!!!!!!
+
+SoftwareSerial BluetoothSerial(BT_RX, BT_TX); // создаём блютуз терминал с пинами RX и TX
+
+// Создаём объект для фильтра Madgwick
+Madgwick filter;
+// Создаём объект для работы с гироскопом
+Gyroscope gyroscope;
+// Создаём объект для работы с акселерометром
+Accelerometer accelerometer;
+// Переменные для данных с гироскопа и акселерометра
+float gx, gy, gz, ax, ay, az;
+// Переменные для хранения самолётных углов ориентации
+float yaw, pitch, roll;
+// Переменная для хранения частоты выборок фильтра
+float sampleRate = 100;
+void setup() {
+  // pinmode(rxPIN, INPUT);
+  // pinmode(txPIN, OUTPUT);
+ // Открываем последовательный порт
+ Serial.begin(9600);
+ BluetoothSerial.begin(9600); // открываем порт блютуза
+ // Выводим сообщение о начале инициализации
+ // Инициализируем гироскоп
+ gyroscope.begin();
+ // Инициализируем акселерометр
+ accelerometer.begin();
+ // Инициализируем фильтр
+ filter.begin();
+ // Выводим сообщение об удачной инициализации
+ Serial.println(BluetoothSerial.available());
+}
+void loop() {
+  BluetoothSerial.listen();
+ // Запоминаем текущее время
+ unsigned long startMillis = millis();
+ // Считываем данные с акселерометра в единицах G
+ accelerometer.readAccelerationGXYZ(ax, ay, az);
+ // Считываем данные с гироскопа в радианах в секунду
+ gyroscope.readRotationRadXYZ(gx, gy, gz);
+ // Устанавливаем частоту фильтра
+ filter.setFrequency(sampleRate);
+ // Обновляем входные данные в фильтр
+ filter.update(gx, gy, gz, ax, ay, az);
+ // Получаем из фильтра углы: yaw, pitch и roll
+ yaw = filter.getYawDeg(); // Коорлината Z
+ pitch = filter.getPitchDeg(); //  Координата Y
+ roll = filter.getRollDeg(); // Координата X
+
+
+ // Выводим полученные углы Эйлера в Serial-порт
+//  Serial.print("Z: ");
+//  Serial.print(yaw);
+//  Serial.print("\t\t");
+//  Serial.print("Y: ");
+//  Serial.print(pitch);
+//  Serial.print("\t\t");
+//  Serial.print("X: ");
+//  Serial.println(roll);
+
+
+
+//Вывод в блютуз
+  // BluetoothSerial.print("Z: ");
+  // BluetoothSerial.print(yaw);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("Y: ");
+  // BluetoothSerial.print(pitch);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("X: ");
+  // BluetoothSerial.println(roll);
+ // Вычисляем затраченное время на обработку данных
+ unsigned long deltaMillis = millis() - startMillis;
+ // Вычисляем частоту обработки фильтра
+ sampleRate = 1000 / deltaMillis;
+ String ans = "a";
+ 
+ if (BluetoothSerial.available() > 0) {
+    BluetoothSerial.println(yaw);
+    BluetoothSerial.read();
+
+    // Serial.write(BluetoothSerial.read());
+  }
+//   // Serial.println("asdasd");
+  if (Serial.available()) {
+    BluetoothSerial.write(Serial.read());
+  }
+  
+  // the success callback is called whenever data is received
+
+ 
+}
