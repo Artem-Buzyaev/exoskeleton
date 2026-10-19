@@ -1,0 +1,128 @@
+/// ВОДОРАЗДЕЛ
+
+
+
+// подключении imu-сенсор на 10 степеней свободы v2: G в GND; V в 3.3V/5v; C в ScL; D в SDA.
+#include <TroykaIMU.h> // Библиотека для работы с модулями IMU
+#include <SoftwareSerial.h>
+
+#include <nRF24L01.h> // Импортируемый модуль для работы с радиопередатчиком
+#include <RF24.h> // Библиотека
+
+
+// !!!!! Заменил 9 на 7. А 10 на 6. Для радиомодуля проверить на работатоспособность при 7 и 6
+#define BT_RX 7 // порты для RX 0 
+#define BT_TX 6 // для TX 1 для ардуино у других плат см. свои !!!!!!!!!!!!!!!!!
+
+SoftwareSerial BluetoothSerial(BT_RX, BT_TX); // создаём блютуз терминал с пинами RX и TX
+
+RF24 radio(9, 10); // порты CE и SS для радиомодуля
+
+// Создаём объект для фильтра Madgwick
+Madgwick filter;
+// Создаём объект для работы с гироскопом
+Gyroscope gyroscope;
+// Создаём объект для работы с акселерометром
+Accelerometer accelerometer;
+// Переменные для данных с гироскопа и акселерометра
+float gx, gy, gz, ax, ay, az;
+// Переменные для хранения самолётных углов ориентации
+float yaw, pitch, roll;
+// Переменная для хранения частоты выборок фильтра
+float sampleRate = 100;
+
+
+int receivedData[5]; // Массив для получения данных
+
+uint8_t pipe; // Переменная для определения номера трубы по которой принят сигнал
+
+void setup() {
+  // pinmode(rxPIN, INPUT);
+  // pinmode(txPIN, OUTPUT);
+ // Открываем последовательный порт
+ Serial.begin(9600);
+ BluetoothSerial.begin(9600); // открываем порт блютуза
+ // Выводим сообщение о начале инициализации
+ // Инициализируем гироскоп
+ gyroscope.begin();
+ // Инициализируем акселерометр
+ accelerometer.begin();
+ // Инициализируем фильтр
+ filter.begin();
+ // Выводим сообщение об удачной инициализации
+ radio.begin(); // Инициализация радиомодуля
+ radio.setChannel(112); // Выбираем канал для радиомодуля (Должен совподать с каналом передачика)
+ radio.setDataRate(RF24_2MBPS); // Выбираем скорость приема радиомодуля (Должен совподать с каналом передачика)
+ radio.setPALevel(RF24_PA_MIN); // Выбираем мощность радиомодуля (Должен совподать с каналом передачика)
+ radio.openReadingPipe(1, 0x0123456789LL); // Выбираем какую трубу (из 6 слушать) и по какой трубе
+ radio.startListening(); // Ставим радиомодуль на прослушивание 
+
+ Serial.println(BluetoothSerial.available());
+}
+void loop() {
+  BluetoothSerial.listen();
+ // Запоминаем текущее время
+ unsigned long startMillis = millis();
+ // Считываем данные с акселерометра в единицах G
+ accelerometer.readAccelerationGXYZ(ax, ay, az);
+ // Считываем данные с гироскопа в радианах в секунду
+ gyroscope.readRotationRadXYZ(gx, gy, gz);
+ // Устанавливаем частоту фильтра
+ filter.setFrequency(sampleRate);
+ // Обновляем входные данные в фильтр
+ filter.update(gx, gy, gz, ax, ay, az);
+ // Получаем из фильтра углы: yaw, pitch и roll
+ yaw = filter.getYawDeg(); // Коорлината Z
+ pitch = filter.getPitchDeg(); //  Координата Y
+ roll = filter.getRollDeg(); // Координата X
+
+
+ // Выводим полученные углы Эйлера в Serial-порт
+//  Serial.print("Z: ");
+//  Serial.print(yaw);
+//  Serial.print("\t\t");
+//  Serial.print("Y: ");
+//  Serial.print(pitch);
+//  Serial.print("\t\t");
+//  Serial.print("X: ");
+//  Serial.println(roll);
+
+
+
+//Вывод в блютуз
+  // BluetoothSerial.print("Z: ");
+  // BluetoothSerial.print(yaw);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("Y: ");
+  // BluetoothSerial.print(pitch);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("X: ");
+  // BluetoothSerial.println(roll);
+ // Вычисляем затраченное время на обработку данных
+ unsigned long deltaMillis = millis() - startMillis;
+ // Вычисляем частоту обработки фильтра
+ sampleRate = 1000 / deltaMillis;
+ String ans = "a";
+ 
+ if (BluetoothSerial.available() > 0) {
+    BluetoothSerial.println(yaw);
+    BluetoothSerial.read();
+
+    // Serial.write(BluetoothSerial.read());
+  }
+//   // Serial.println("asdasd");
+  if (Serial.available()) {
+    BluetoothSerial.write(Serial.read());
+  }
+  if (radio.available(&pipe)) {
+    /*
+      Читаем данные из буфера в массив receivedData указывая
+      сколько всего байт может поместиться в массив.
+    */
+    radio.read(&receivedData, sizeof(receivedData));
+
+    Serial.println(receivedData);
+  // the success callback is called whenever data is received
+  }
+ 
+}
