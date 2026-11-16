@@ -64,3 +64,105 @@ void loop() {
     Serial.println(pipe);
   }
 }
+
+
+
+
+///////////////ВРЕМЕННО
+#include <TroykaIMU.h> // Библиотека для работы с модулями IMU
+#include <SoftwareSerial.h>
+#include <nRF24L01.h>
+/*
+  Подключаем библиотеку  для работы с nRF24L01+
+*/
+#include <RF24.h>
+
+
+
+
+
+Madgwick filter;
+// Создаём объект для работы с гироскопом
+Gyroscope gyroscope;
+// Создаём объект для работы с акселерометром
+Accelerometer accelerometer;
+// Переменные для данных с гироскопа и акселерометра
+float gx, gy, gz, ax, ay, az;
+// Переменные для хранения самолётных углов ориентации
+float yaw, pitch, roll;
+// Переменная для хранения частоты выборок фильтра
+float sampleRate = 100;
+RF24 radio(9, 10);
+void setup() {
+  // pinmode(rxPIN, INPUT);
+  // pinmode(txPIN, OUTPUT);
+ // Открываем последовательный порт
+ Serial.begin(9600);
+
+ radio.begin();
+ radio.setChannel(112);
+ radio.setDataRate(RF24_2MBPS);
+ radio.setPALevel(RF24_PA_MIN);
+ radio.openWritingPipe(0x0123456789LL);
+ // Выводим сообщение о начале инициализации
+ // Инициализируем гироскоп
+ gyroscope.begin();
+ // Инициализируем акселерометр
+ accelerometer.begin();
+ // Инициализируем фильтр
+ filter.begin();
+ // Выводим сообщение об удачной инициализации
+int dataToBeTransmitted[5] = {'6', '1', '2', '3', '4'};
+}
+void loop() {
+
+ // Запоминаем текущее время
+ unsigned long startMillis = millis();
+ // Считываем данные с акселерометра в единицах G
+ accelerometer.readAccelerationGXYZ(ax, ay, az);
+ // Считываем данные с гироскопа в радианах в секунду
+ gyroscope.readRotationRadXYZ(gx, gy, gz);
+ // Устанавливаем частоту фильтра
+ filter.setFrequency(sampleRate);
+ // Обновляем входные данные в фильтр
+ filter.update(gx, gy, gz, ax, ay, az);
+ // Получаем из фильтра углы: yaw, pitch и roll
+ yaw = filter.getYawDeg(); // Коорлината Z
+ pitch = filter.getPitchDeg(); //  Координата Y
+ roll = filter.getRollDeg(); // Координата X
+
+
+ // Выводим полученные углы Эйлера в Serial-порт
+ Serial.print("Z: ");
+ Serial.print(yaw);
+ Serial.print("\t\t");
+ Serial.print("Y: ");
+ Serial.print(pitch);
+ Serial.print("\t\t");
+ Serial.print("X: ");
+ Serial.println(roll);
+
+
+
+//Вывод в блютуз
+  // BluetoothSerial.print("Z: ");
+  // BluetoothSerial.print(yaw);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("Y: ");
+  // BluetoothSerial.print(pitch);
+  // BluetoothSerial.print("\t\t");
+  // BluetoothSerial.print("X: ");
+  // BluetoothSerial.println(roll);
+ // Вычисляем затраченное время на обработку данных
+ unsigned long deltaMillis = millis() - startMillis;
+ // Вычисляем частоту обработки фильтра
+ sampleRate = 1000 / deltaMillis;
+ String ans = "a";
+ int dataToBeTransmitted[3] = {4, 5, 6};
+ radio.write(&dataToBeTransmitted, sizeof(dataToBeTransmitted));
+ 
+
+  // the success callback is called whenever data is received
+
+ 
+}
