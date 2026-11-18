@@ -72,3 +72,172 @@ void loop() {
  sampleRate = 1000 / deltaMillis;
  
 }
+
+
+
+
+
+
+
+
+
+
+//////// djkjghjdsf
+#include <TroykaIMU.h> // Библиотека для работы с модулями IMU
+#include <SoftwareSerial.h>
+
+#include <nRF24L01.h>
+#include <RF24.h>
+
+#include <async.h>
+
+
+
+
+
+Async asyncEngine = Async();
+
+Madgwick filter;
+// Создаём объект для работы с гироскопом
+Gyroscope gyroscope;
+// Создаём объект для работы с акселерометром
+Accelerometer accelerometer;
+// Переменные для данных с гироскопа и акселерометра
+float gx, gy, gz, ax, ay, az;
+// Переменные для хранения самолётных углов ориентации
+float yaw, pitch, roll;
+// Переменная для хранения частоты выборок фильтра
+float sampleRate = 100;
+
+float x = 0.01;
+
+float dataToBeTransmitted[3];
+
+int i = 0;
+RF24 radio(9, 10);
+void setup() {
+  // pinmode(rxPIN, INPUT);
+  // pinmode(txPIN, OUTPUT);
+ // Открываем последовательный порт
+ Serial.begin(9600);
+ 
+ radio.begin();
+ radio.setChannel(112);
+ radio.setDataRate(RF24_2MBPS);
+ radio.setPALevel(RF24_PA_MIN);                                                                                    
+ radio.openWritingPipe(0x0123456789LL);
+ gyroscope.begin();
+ accelerometer.begin();
+ filter.begin();
+//  Serial.println(dataToBeTransmitted[0]);
+}
+void loop() {
+ asyncEngine.run();
+ short id = asyncEngine.setInterval(blinkLed, 10);
+
+
+ Serial.print("[ ");
+ for (i = 0; i < 3; i++) {
+      Serial.print(dataToBeTransmitted[i]);
+      Serial.print(' ');
+    }
+ Serial.println("]");
+
+ radio.write(&dataToBeTransmitted, sizeof(dataToBeTransmitted));
+}
+
+
+void blinkLed() {
+ unsigned long startMillis = millis();
+ // Считываем данные с акселерометра в единицах G
+ accelerometer.readAccelerationGXYZ(ax, ay, az);
+ // Считываем данные с гироскопа в радианах в секунду
+ gyroscope.readRotationRadXYZ(gx, gy, gz);
+ // Устанавливаем частоту фильтра
+ filter.setFrequency(sampleRate);
+ // Обновляем входные данные в фильтр
+ filter.update(gx, gy, gz, ax, ay, az);
+ // Получаем из фильтра углы: yaw, pitch и roll
+ yaw = filter.getYawDeg() - x; // Коорлината Z
+ pitch = filter.getPitchDeg(); //  Координата Y
+ roll = filter.getRollDeg(); // Координата X
+
+
+ // Выводим полученные углы Эйлера в Serial-порт
+//  Serial.print("Z: ");
+//  Serial.print(yaw);
+//  Serial.print("\t\t");
+//  Serial.print("Y: ");
+//  Serial.print(pitch);
+//  Serial.print("\t\t");
+//  Serial.print("X: ");
+//  Serial.println(roll);
+ unsigned long deltaMillis = millis() - startMillis;
+ // Вычисляем частоту обработки фильтра
+ dataToBeTransmitted[0] = roll;
+ dataToBeTransmitted[1] = pitch;
+ dataToBeTransmitted[2] = yaw;
+ sampleRate = 1000 / deltaMillis;
+ String ans = "a";
+ x = x + 0.0005;
+}
+
+
+
+
+
+
+////// 2
+#include <nRF24L01.h>
+#include <RF24.h>
+
+#include <TroykaIMU.h> // Библиотека для работы с модулями IMU
+#include <SoftwareSerial.h>
+
+RF24 radio(9, 10);
+
+Async asyncEngine = Async();
+
+Madgwick filter;
+Gyroscope gyroscope; // Создаём объект для работы с гироскопом
+Accelerometer accelerometer;// Создаём объект для работы с акселерометром
+float gx, gy, gz, ax, ay, az; // Переменные для данных с гироскопа и акселерометра
+float yaw, pitch, roll; // Переменные для хранения самолётных углов ориентации
+float sampleRate = 100; // Переменная для хранения частоты выборок фильтра
+
+float receivedData[3];
+
+uint8_t pipe;
+
+uint8_t i;
+void setup() {
+
+  Serial.begin(115200);
+  radio.begin();
+
+  radio.setChannel(112);
+  radio.setDataRate(RF24_2MBPS);
+  radio.setPALevel(RF24_PA_MIN);
+  radio.openReadingPipe(1, 0x0123456789LL);
+  radio.startListening();
+
+  gyroscope.begin();
+  accelerometer.begin();
+  filter.begin();
+
+}
+void loop() {
+
+  if (radio.available(&pipe)) {
+
+    radio.read(&receivedData, sizeof(receivedData));
+
+    Serial.print("Данные [ ");
+    for (i = 0; i < 3; i++) {
+      Serial.print(receivedData[i]);
+      Serial.print(' ');
+    }
+    Serial.print(" ]");
+    Serial.println(pipe);
+  }
+}
