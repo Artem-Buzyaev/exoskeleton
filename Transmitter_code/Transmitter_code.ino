@@ -104,7 +104,7 @@ void calculations() { // Асинхронная функция для измер
 //  Serial.println(roll);
 
 
-// Вывод передачи (2)
+// Вывод пережачи (2)
 //  Serial.print("[ ");
 //  for (i = 0; i < 3; i++) {
 //       Serial.print(dataToBeTransmitted[i]);
